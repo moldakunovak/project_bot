@@ -1,9 +1,8 @@
-
-
 import telebot
 import requests
 from bs4 import BeautifulSoup
 from telebot import types
+from parse import get_parse
 from telebot.types import ReplyKeyboardMarkup
 from decouple import config
 
@@ -70,100 +69,44 @@ def get_start_message(message):
     bot.send_message(message.chat.id, text_message, reply_markup=markup)
 
 
-
-
 @bot.callback_query_handler(func=lambda call: True)
 def get_call_data(call):
     if call.data == 'actual_curs':
-        URL = 'https://www.nbkr.kg/XML/daily.xml'
-        response = requests.get(URL)
-        print(response)
-        soup = BeautifulSoup(response.text, 'xml')
-        print(soup)
-        currency = soup.CurrencyRates.findAll('Currency')
-        print(currency)
-        values = {'USD': currency[0].Value, 'EUR': currency[1].Value,
-                  'KZT': currency[2].Value, 'RUB': currency[3].Value}
-        for key, value in values.items():
+        nominal_values = get_parse()
+        for key, value in nominal_values.items():
             bot.send_message(call.message.chat.id, f"<i><b>{key}</b>: {value.text} сом</i>", parse_mode="HTML")
     if call.data == 'converter':
-        text_message = 'Выберите валюту: '
-        markup = types.ReplyKeyboardMarkup(row_width=2)
-        btn1 = types.KeyboardButton("eur")
-        btn2 = types.KeyboardButton("usd")
-    #
-        markup.add(btn1, btn2)
-        bot.send_message(call.message.chat.id, text_message, reply_markup=markup)
+        currency_sum = bot.send_message(call.message.chat.id, 'Введите сумму:')
+        bot.register_next_step_handler(currency_sum, choose_exchange)
 
 
-
-@bot.message_handler(content_types=['text'])
-def eo_message(message):
-    s = int(message.text) * 83.3
-    bot.send_message(message.chat.id, f"{s}")
-
-def after_text_2(message):
-    print('введённый пользователем номер телефона на шаге "смс":', message.text)
-
-
-    # elif call.data == 'buy':
-    #     text_message = f"Введите сумму для покупки:"
-    #     markup = types.InlineKeyboardMarkup(row_width=2)
-    #     btn1 = types.InlineKeyboardButton("USD", callback_data="buy_usd")
-    #     btn2 = types.InlineKeyboardButton("EUR", callback_data='buy_eur')
-    #     btn3 = types.InlineKeyboardButton("KZT", callback_data='buy_kzt')
-    #     btn4 = types.InlineKeyboardButton("RUB", callback_data='buy_rub')
-    #     markup.add(btn1, btn2, btn3, btn4)
-    #     bot.send_message(call.message.chat.id, text_message, reply_markup=markup)
+def choose_exchange(message):
+    global currency_sum
+    currency_sum = message.text
+    text_message = 'Выберите валюту: '
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
+    btn1 = types.KeyboardButton("USD")
+    btn2 = types.KeyboardButton("EUR")
+    btn3 = types.KeyboardButton("KZT")
+    btn4 = types.KeyboardButton("RUB")
+    markup.add(btn1, btn2, btn3, btn4)
+    nominal = bot.send_message(message.chat.id, text_message, reply_markup=markup)
+    bot.register_next_step_handler(nominal, get_result)
 
 
+def get_result(message):
+    nominal = message.text
+    current_rate = get_parse()
+    if nominal == "USD":
+        total_sum = float(currency_sum) * float(current_rate['USD'].text.replace(',', '.'))
+    elif nominal == "EUR":
+        total_sum = float(currency_sum) * float(current_rate['EUR'].text.replace(',', '.'))
+    elif nominal == "KZT":
+        total_sum = float(currency_sum) * float(current_rate['KZT'].text.replace(',', '.'))
+    else:
+        total_sum = float(currency_sum) * float(current_rate['RUB'].text.replace(',', '.'))
+    bot.send_message(message.chat.id, f"{currency_sum} {nominal} = {round(total_sum, 2)} СОМ")
 
-
-
-
-
-
-
-
-
-@bot.message_handler(content_types=['text'])
-def eho_message(message):
-    if message.text.lower() == "curs":
-        # summa = float(input("введите сумму для конвертации: "))
-        markup = types.InlineKeyboardMarkup(row_width=2)
-        btn1 = types.InlineKeyboardButton("KGS", callback_data="KGS")
-        btn2 = types.InlineKeyboardButton("USD", callback_data="USD")
-        btn3 = types.InlineKeyboardButton("EUR", callback_data="EUR")
-        btn4 = types.InlineKeyboardButton("RUB", callback_data="RUB")
-        # btn5 = types.InlineKeyboardButton("Assembler", url="https://ru.wikipedia.org/wiki/%D0%90%D1%81%D1%81%D0%B5%D0%BC%D0%B1%D0%BB%D0%B5%D1%80")
-        markup.add(btn1, btn2, btn3, btn4)
-    # print(message.text)
-        mess = f"<i><b>Выберите валюту </b>: </i>"
-        bot.send_message(message.chat.id, mess, parse_mode="HTML", reply_markup=markup)
-
-@bot.callback_query_handler(func=lambda call: True)
-def get_call_data(call):
-    if call.data == "KGS":
-        mess = "<a href='https://www.nbkr.kg/XML/daily.xml'>KGS</a>"
-        bot.send_message(call.message.chat.id, mess, parse_mode="HTML")
-    if call.data == "USD":
-        mess = "<a href='https://www.nbkr.kg/XML/daily.xml''>USD</a>"
-        bot.send_message(call.message.chat.id, mess, parse_mode="HTML")
-    if call.data == "EUR":
-        mess = "<a href='https://www.nbkr.kg/XML/daily.xml''>EUR</a>"
-        bot.send_message(call.message.chat.id, mess, parse_mode="HTML")
-    if call.data == "RUB":
-        mess = "<a href='https://www.nbkr.kg/XML/daily.xml''>RUB</a>"
-        bot.send_message(call.message.chat.id, mess, parse_mode="HTML")
-
-# @bot.message_handler(content_types=['text'])
-# def get_markup(message):
-#     if message.text.lower() == "выбор":
-#         markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-#         btn1 =types.KeyboardButton("yes")
-#         btn2 =types.KeyboardButton("no")
-#         markup.add(btn1, btn2)
-#         bot.send_message(message.chat.id, "выберите:", reply_markup=markup)
 
 bot.polling()
 
