@@ -1,3 +1,5 @@
+
+
 import telebot
 import requests
 from bs4 import BeautifulSoup
@@ -75,25 +77,30 @@ def get_call_data(call):
     if call.data == 'actual_curs':
         URL = 'https://www.nbkr.kg/XML/daily.xml'
         response = requests.get(URL)
+        print(response)
         soup = BeautifulSoup(response.text, 'xml')
+        print(soup)
         currency = soup.CurrencyRates.findAll('Currency')
+        print(currency)
         values = {'USD': currency[0].Value, 'EUR': currency[1].Value,
                   'KZT': currency[2].Value, 'RUB': currency[3].Value}
         for key, value in values.items():
             bot.send_message(call.message.chat.id, f"<i><b>{key}</b>: {value.text} сом</i>", parse_mode="HTML")
-    elif call.data == 'converter':
-        text_message = f"Выберите операцию:"
-        markup = types.InlineKeyboardMarkup(row_width=1)
-        btn1 = types.InlineKeyboardButton("Покупка", callback_data="buy")
-        btn2 = types.InlineKeyboardButton("Продажа", callback_data='sell')
+    if call.data == 'converter':
+        text_message = 'Выберите валюту: '
+        markup = types.ReplyKeyboardMarkup(row_width=2)
+        btn1 = types.KeyboardButton("eur")
+        btn2 = types.KeyboardButton("usd")
+    #
         markup.add(btn1, btn2)
         bot.send_message(call.message.chat.id, text_message, reply_markup=markup)
 
-@bot.callback_query_handler(func=lambda call: call.data == 'buy')
-def send_all_genres(call):
-    msg = bot.send_message(call.message.from_user.id, 'Введите сумму для покупки: ')
-    bot.register_next_step_handler(msg, after_text_2)
 
+
+@bot.message_handler(content_types=['text'])
+def eo_message(message):
+    s = int(message.text) * 83.3
+    bot.send_message(message.chat.id, f"{s}")
 
 def after_text_2(message):
     print('введённый пользователем номер телефона на шаге "смс":', message.text)
